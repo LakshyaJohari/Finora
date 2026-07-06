@@ -3,6 +3,12 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Transaction } from '../types'
 
+export type NewTransaction = Omit<
+  Transaction,
+  'id' | 'user_id' | 'created_at' | 'currency' | 'ai_category_reasoning'
+> &
+  Partial<Pick<Transaction, 'currency' | 'ai_category_reasoning'>>
+
 export function useTransactions() {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -35,5 +41,43 @@ export function useTransactions() {
     refetch()
   }, [refetch])
 
-  return { transactions, loading, error, refetch }
+  async function addTransaction(input: NewTransaction) {
+    if (!user) throw new Error('Must be signed in to add a transaction')
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({ ...input, user_id: user.id })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    setTransactions((prev) =>
+      [data as Transaction, ...prev].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)),
+    )
+    return data as Transaction
+  }
+
+  async function bulkInsertTransactions(inputs: NewTransaction[]) {
+    if (!user) throw new Error('Must be signed in to import transactions')
+    if (inputs.length === 0) return [] as Transaction[]
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(inputs.map((input) => ({ ...input, user_id: user.id })))
+      .select()
+    if (error) throw new Error(error.message)
+    await refetch()
+    return data as Transaction[]
+  }
+
+  async function updateTransaction(id: string, patch: Partial<NewTransaction>) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    setTransactions((prev) => prev.map((t) => (t.id === id ? (data as Transaction) : t)))
+    return data as Transaction
+  }
+
+  return { transactions, loading, error, refetch, addTransaction, bulkInsertTransactions, updateTransaction }
 }
