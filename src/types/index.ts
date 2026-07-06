@@ -1,0 +1,54 @@
+export interface Profile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  created_at: string
+}
+
+export const TRANSACTION_CATEGORIES = [
+  'Food',
+  'Transport',
+  'Shopping',
+  'Bills',
+  'Entertainment',
+  'Health',
+  'Other',
+  'Uncategorized',
+] as const
+
+export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number]
+
+export interface Transaction {
+  id: string
+  user_id: string
+  amount: number
+  currency: string
+  category: string
+  merchant: string | null
+  description: string | null
+  transaction_date: string
+  is_recurring: boolean
+  ai_category_reasoning: string | null
+  created_at: string
+}
+
+export interface Goal {
+  id: string
+  user_id: string
+  name: string
+  target_amount: number
+  current_amount: number
+  target_date: string | null
+  category: string | null
+  created_at: string
+}
+
+export type ChatRole = 'user' | 'assistant'
+
+export interface ChatMessage {
+  id: string
+  user_id: string
+  role: ChatRole
+  content: string
+  created_at: string
+}
