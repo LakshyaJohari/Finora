@@ -1,20 +1,50 @@
-import { useMemo, useState } from 'react'
-import { Plus, Upload, Receipt } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Upload, Receipt, RefreshCw } from 'lucide-react'
 import { RequireAuthButton } from '../components/RequireAuth'
 import { AddExpenseModal } from '../components/AddExpenseModal'
 import { ImportCsvModal } from '../components/ImportCsvModal'
 import { CategoryBadge } from '../components/CategoryBadge'
+import { ReasoningHint } from '../components/ReasoningHint'
 import { useTransactions } from '../hooks/useTransactions'
 import { TRANSACTION_CATEGORIES } from '../types'
+import type { Transaction } from '../types'
+import { categorizeTransactions } from '../lib/groq'
+import { detectRecurring } from '../lib/recurring'
 
 const currency = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
 export default function Expenses() {
-  const { transactions, loading, addTransaction, bulkInsertTransactions } = useTransactions()
+  const { transactions, loading, addTransaction, bulkInsertTransactions, updateTransaction } = useTransactions()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
+  const [categorizing, setCategorizing] = useState(false)
+  const [categorizeNotice, setCategorizeNotice] = useState<string | null>(null)
+
+  const recurringGroups = useMemo(() => detectRecurring(transactions), [transactions])
+  const recurringSyncAttempted = useRef<Set<string>>(new Set())
+
+  // Additive only: mark newly-detected recurring transactions, never clear a
+  // flag a user set manually in the add-expense form. Tracks attempted ids in
+  // a ref (not state) so an in-flight update can't be re-fired by the next
+  // render before its response comes back and updates `transactions`.
+  useEffect(() => {
+    const toFlag = recurringGroups
+      .flatMap((g) => g.transactionIds)
+      .filter((id) => {
+        if (recurringSyncAttempted.current.has(id)) return false
+        const tx = transactions.find((t) => t.id === id)
+        return tx && !tx.is_recurring
+      })
+    toFlag.forEach((id) => {
+      recurringSyncAttempted.current.add(id)
+      updateTransaction(id, { is_recurring: true }).catch(() => {
+        recurringSyncAttempted.current.delete(id)
+      })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recurringGroups])
 
   const visible = useMemo(() => {
     let rows = transactions
@@ -27,6 +57,29 @@ export default function Expenses() {
         : a.transaction_date.localeCompare(b.transaction_date),
     )
   }, [transactions, categoryFilter, sortDir])
+
+  async function categorizeAndUpdate(rows: Transaction[]) {
+    const candidates = rows.filter((r) => r.category === 'Uncategorized')
+    if (candidates.length === 0) return
+    setCategorizing(true)
+    setCategorizeNotice(null)
+    const results = await categorizeTransactions(
+      candidates.map((r) => ({ id: r.id, merchant: r.merchant, description: r.description, amount: r.amount })),
+    )
+    if (!results) {
+      setCategorizeNotice("We couldn't auto-categorize these right now - they're saved as Uncategorized, and you can try again anytime.")
+      setCategorizing(false)
+      return
+    }
+    await Promise.all(
+      results.map((r) =>
+        updateTransaction(r.id, { category: r.category, ai_category_reasoning: r.reasoning }).catch(() => {}),
+      ),
+    )
+    setCategorizing(false)
+  }
+
+  const uncategorizedCount = transactions.filter((t) => t.category === 'Uncategorized').length
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,10 +101,43 @@ export default function Expenses() {
       </div>
 
       {showAddModal && (
-        <AddExpenseModal onClose={() => setShowAddModal(false)} onSubmit={(input) => addTransaction(input).then(() => {})} />
+        <AddExpenseModal
+          onClose={() => setShowAddModal(false)}
+          onSubmit={(input) => addTransaction(input).then(() => {})}
+        />
       )}
       {showImportModal && (
-        <ImportCsvModal onClose={() => setShowImportModal(false)} onImport={(inputs) => bulkInsertTransactions(inputs).then(() => {})} />
+        <ImportCsvModal
+          onClose={() => setShowImportModal(false)}
+          onImport={(inputs) => bulkInsertTransactions(inputs).then((rows) => categorizeAndUpdate(rows))}
+        />
+      )}
+
+      {categorizeNotice && (
+        <p className="rounded-card border border-danger/20 bg-danger-tint px-4 py-3 text-sm text-danger">
+          {categorizeNotice}
+        </p>
+      )}
+
+      {recurringGroups.length > 0 && (
+        <div className="card">
+          <h2 className="font-display text-xl text-ink">Subscriptions</h2>
+          <p className="mt-1 text-sm text-ink-muted">Recurring charges detected from your transaction history.</p>
+          <div className="mt-3 divide-y divide-border">
+            {recurringGroups.map((g) => (
+              <div key={g.key} className="flex items-center justify-between py-2.5">
+                <p className="text-ink">{g.label}</p>
+                <p className="font-mono text-sm text-ink">{currency(g.averageAmount)}/mo</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+            <p className="font-medium text-ink">Monthly total</p>
+            <p className="font-mono text-ink">
+              {currency(recurringGroups.reduce((sum, g) => sum + g.averageAmount, 0))}/mo
+            </p>
+          </div>
+        </div>
       )}
 
       {!loading && transactions.length === 0 && (
@@ -95,6 +181,17 @@ export default function Expenses() {
             >
               Date: {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
             </button>
+            {uncategorizedCount > 0 && (
+              <RequireAuthButton
+                action={() => categorizeAndUpdate(transactions.filter((t) => t.category === 'Uncategorized'))}
+                variant="ghost"
+                disabled={categorizing}
+                className="ml-auto"
+              >
+                <RefreshCw size={14} className={categorizing ? 'animate-spin' : ''} />
+                {categorizing ? 'Categorizing…' : `Re-categorize ${uncategorizedCount}`}
+              </RequireAuthButton>
+            )}
           </div>
 
           {loading ? (
@@ -120,8 +217,9 @@ export default function Expenses() {
                       })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <CategoryBadge category={tx.category} />
+                    <ReasoningHint reasoning={tx.ai_category_reasoning} />
                     <p className={`w-24 text-right font-mono text-sm ${tx.amount > 0 ? 'text-teal-dark' : 'text-ink'}`}>
                       {tx.amount > 0 ? '+' : ''}
                       {currency(tx.amount)}
