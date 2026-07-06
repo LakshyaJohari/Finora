@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-base: 251 247 240;
+  --color-surface: 255 255 255;
+  --color-ink: 38 48 46;
+  --color-ink-muted: 92 107 103;
+
+  --color-teal: 42 127 123;
+  --color-teal-light: 63 156 151;
+  --color-teal-dark: 30 95 92;
+  --color-teal-tint: 231 242 241;
+
+  --color-marigold: 232 162 76;
+  --color-marigold-tint: 251 240 221;
+
+  --color-danger: 196 96 74;
+  --color-danger-tint: 247 233 229;
+
+  --color-border: 232 226 214;
+
+  --shadow-card: 0 2px 10px rgba(38, 48, 46, 0.07), 0 1px 2px rgba(38, 48, 46, 0.04);
+}
+
+.dark {
+  --color-base: 27 33 31;
+  --color-surface: 36 43 41;
+  --color-ink: 242 239 231;
+  --color-ink-muted: 156 168 164;
+
+  --color-teal: 42 127 123;
+  --color-teal-light: 63 156 151;
+  --color-teal-dark: 30 95 92;
+  --color-teal-tint: 37 56 53;
+
+  --color-marigold: 232 162 76;
+  --color-marigold-tint: 63 60 46;
+
+  --color-danger: 196 96 74;
+  --color-danger-tint: 58 50 46;
+
+  --color-border: 51 65 61;
+
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+  }
+
+  body {
+    @apply bg-base text-ink transition-colors duration-200;
+  }
+
+  ::selection {
+    @apply bg-teal-tint text-teal-dark;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal ring-offset-2 ring-offset-base;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-border bg-surface p-6 shadow-softer;
+  }
+}
