@@ -16,12 +16,15 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useTransactions } from '../hooks/useTransactions'
+import { useGoals } from '../hooks/useGoals'
 import {
   computeCashFlow,
   computeCategoryBreakdown,
   computeStats,
   computeTopCategoryInsight,
 } from '../lib/dashboardStats'
+import { computeHealthScore } from '../lib/healthScore'
+import { HealthScoreCard } from '../components/HealthScoreCard'
 
 const currency = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -34,12 +37,14 @@ export default function Dashboard() {
   const { user } = useAuth()
   const { theme } = useTheme()
   const { transactions, loading } = useTransactions()
+  const { goals } = useGoals()
   const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0]
 
   const stats = useMemo(() => computeStats(transactions), [transactions])
   const cashFlow = useMemo(() => computeCashFlow(transactions), [transactions])
   const categoryBreakdown = useMemo(() => computeCategoryBreakdown(transactions), [transactions])
   const insight = useMemo(() => computeTopCategoryInsight(transactions), [transactions])
+  const healthScore = useMemo(() => computeHealthScore(transactions, goals), [transactions, goals])
 
   const axisColor = theme === 'dark' ? '#9CA8A4' : '#5C6B67'
   const gridColor = theme === 'dark' ? '#33413D' : '#E8E2D6'
@@ -81,6 +86,8 @@ export default function Dashboard() {
         </h1>
         <p className="mt-1 text-ink-muted">Here's where things stand today.</p>
       </div>
+
+      <HealthScoreCard result={healthScore} />
 
       <div className="card grid grid-cols-1 gap-8 sm:grid-cols-3">
         <div>
