@@ -1,16 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Send } from 'lucide-react'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { useAdvisorChat } from '../hooks/useAdvisorChat'
+import { GroundedText } from '../components/GroundedText'
+import { TypingIndicator } from '../components/TypingIndicator'
+
+const SUGGESTED_PROMPTS = [
+  'Can I afford a $500 purchase?',
+  "How's my health score looking?",
+  'Should I adjust my goal savings?',
+  'Why did my spending change this month?',
+]
 
 export default function Advisor() {
   const guard = useRequireAuth()
-  const { messages, sending, error, sendMessage } = useAdvisorChat()
+  const { messages, loading, sending, error, sendMessage } = useAdvisorChat()
   const [draft, setDraft] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-  function submit() {
-    const text = draft.trim()
-    if (!text) return
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, sending])
+
+  function submit(text: string) {
+    if (!text.trim()) return
     setDraft('')
     sendMessage(text)
   }
@@ -22,30 +35,45 @@ export default function Advisor() {
         <p className="mt-1 text-ink-muted">Ask Finora anything about your money.</p>
       </div>
 
-      <div className="card flex h-[28rem] flex-col p-0">
+      <div className="card flex h-[32rem] flex-col p-0">
         <div className="flex-1 space-y-3 overflow-y-auto p-6">
-          {messages.length === 0 && (
-            <p className="text-center text-sm text-ink-muted">
-              Ask about your spending, goals, or whether you can afford something - answers are
-              grounded in your real numbers.
-            </p>
+          {!loading && messages.length === 0 && (
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+              <p className="text-sm text-ink-muted">
+                Ask about your spending, goals, or whether you can afford something - answers are
+                grounded in your real numbers.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => guard(() => submit(prompt))}
+                    className="rounded-full border border-teal/30 bg-teal-tint px-3.5 py-2 text-sm font-medium text-teal-dark transition hover:bg-teal/20"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           {messages.map((m) => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <p
                 className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
-                  m.role === 'user' ? 'bg-teal text-white' : 'bg-teal-tint text-ink'
+                  m.role === 'user' ? 'bg-teal-tint text-ink' : 'border border-border bg-surface text-ink'
                 }`}
               >
-                {m.content}
+                {m.role === 'assistant' ? <GroundedText text={m.content} /> : m.content}
               </p>
             </div>
           ))}
           {sending && (
             <div className="flex justify-start">
-              <p className="rounded-2xl bg-teal-tint px-4 py-2.5 text-sm text-ink-muted">Thinking…</p>
+              <TypingIndicator />
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
 
         {error && (
@@ -55,7 +83,7 @@ export default function Advisor() {
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            guard(submit)
+            guard(() => submit(draft))
           }}
           className="flex items-center gap-3 border-t border-border p-4"
         >
