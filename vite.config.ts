@@ -1,7 +1,8 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import type { IncomingMessage, ServerResponse } from 'http'
 
-function readJsonBody(req: import('http').IncomingMessage): Promise<any> {
+function readJsonBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
     let raw = ''
     req.on('data', (chunk) => (raw += chunk))
@@ -12,6 +13,31 @@ function readJsonBody(req: import('http').IncomingMessage): Promise<any> {
         reject(err)
       }
     })
+  })
+}
+
+function jsonRoute(
+  server: import('vite').ViteDevServer,
+  path: string,
+  handle: (body: any) => Promise<unknown>,
+) {
+  server.middlewares.use(path, async (req: IncomingMessage, res: ServerResponse) => {
+    if (req.method !== 'POST') {
+      res.statusCode = 405
+      res.end()
+      return
+    }
+    try {
+      const body = await readJsonBody(req)
+      const result = await handle(body)
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify(result))
+    } catch (err) {
+      console.error(`[${path}]`, err)
+      res.statusCode = 500
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({ error: 'request_failed' }))
+    }
   })
 }
 
@@ -30,24 +56,16 @@ function localApiRoutes(env: Record<string, string>): Plugin {
       if (env.HTTPS_PROXY) process.env.HTTPS_PROXY = env.HTTPS_PROXY
       if (env.HTTP_PROXY) process.env.HTTP_PROXY = env.HTTP_PROXY
 
-      server.middlewares.use('/api/categorize', async (req, res) => {
-        if (req.method !== 'POST') {
-          res.statusCode = 405
-          res.end()
-          return
-        }
-        try {
-          const { categorizeBatch } = await import('./api/_shared/categorize.ts')
-          const body = await readJsonBody(req)
-          const results = await categorizeBatch(body?.transactions ?? [])
-          res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify({ results }))
-        } catch (err) {
-          console.error('[api/categorize]', err)
-          res.statusCode = 500
-          res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify({ error: 'categorization_failed' }))
-        }
+      jsonRoute(server, '/api/categorize', async (body) => {
+        const { categorizeBatch } = await import('./api/_shared/categorize.ts')
+        const results = await categorizeBatch(body?.transactions ?? [])
+        return { results }
+      })
+
+      jsonRoute(server, '/api/advisor', async (body) => {
+        const { getAdvisorReply } = await import('./api/_shared/advisor.ts')
+        const reply = await getAdvisorReply(String(body?.context ?? ''), body?.history ?? [], String(body?.message ?? ''))
+        return { reply }
       })
     },
   }
