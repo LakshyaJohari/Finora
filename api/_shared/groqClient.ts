@@ -1,4 +1,12 @@
+import { EnvHttpProxyAgent } from 'undici'
+
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+// Node's global fetch doesn't read HTTP_PROXY/HTTPS_PROXY on its own (unlike
+// browsers). EnvHttpProxyAgent picks those up when present - e.g. behind a
+// corporate proxy in local dev - and is a harmless passthrough when they're
+// unset, like on Vercel.
+const dispatcher = new EnvHttpProxyAgent()
 
 interface GroqMessage {
   role: 'system' | 'user' | 'assistant'
@@ -29,6 +37,8 @@ export async function callGroq(
         ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
       }),
       signal: controller.signal,
+      // @ts-expect-error - dispatcher is a Node/undici-specific fetch extension, not in the DOM lib types
+      dispatcher,
     })
 
     if (!res.ok) {

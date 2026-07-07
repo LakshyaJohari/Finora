@@ -25,6 +25,10 @@ function localApiRoutes(env: Record<string, string>): Plugin {
     name: 'local-api-routes',
     configureServer(server) {
       process.env.GROQ_API_KEY = env.GROQ_API_KEY
+      // The dev server process doesn't inherit the shell's proxy env vars,
+      // so thread them through explicitly (see api/_shared/groqClient.ts).
+      if (env.HTTPS_PROXY) process.env.HTTPS_PROXY = env.HTTPS_PROXY
+      if (env.HTTP_PROXY) process.env.HTTP_PROXY = env.HTTP_PROXY
 
       server.middlewares.use('/api/categorize', async (req, res) => {
         if (req.method !== 'POST') {
