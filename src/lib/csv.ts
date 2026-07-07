@@ -39,7 +39,7 @@ function parseDate(value: unknown): string | null {
     return `${y}-${m}-${d}`
   }
 
-  const parts = raw.split(/[/.\-]/).map((p) => p.trim())
+  const parts = raw.split(/[/.-]/).map((p) => p.trim())
   if (parts.length === 3) {
     const nums = parts.map(Number)
     if (nums.every((n) => Number.isFinite(n))) {

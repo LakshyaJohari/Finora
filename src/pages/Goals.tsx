@@ -7,6 +7,7 @@ import { GoalDetailModal } from '../components/GoalDetailModal'
 import { useGoals, type NewGoal } from '../hooks/useGoals'
 import { useTransactions } from '../hooks/useTransactions'
 import { computeAverageMonthlySavings, computeGoalProjection, goalStatusLabel } from '../lib/goalProjection'
+import { CardSkeleton, ErrorNotice } from '../components/Skeleton'
 import type { Goal } from '../types'
 
 const currency = (n: number) =>
@@ -19,7 +20,7 @@ const STARTER_GOALS: Partial<NewGoal>[] = [
 ]
 
 export default function Goals() {
-  const { goals, loading, addGoal, updateGoal, deleteGoal } = useGoals()
+  const { goals, loading, error, addGoal, updateGoal, deleteGoal } = useGoals()
   const { transactions } = useTransactions()
   const guard = useRequireAuth()
 
@@ -44,7 +45,7 @@ export default function Goals() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl text-ink">Goals</h1>
           <p className="mt-1 text-ink-muted">What you're saving toward, and how close you are.</p>
@@ -66,6 +67,15 @@ export default function Goals() {
 
       {detailGoal && (
         <GoalDetailModal goal={detailGoal} avgMonthlySavings={avgMonthlySavings} onClose={() => setDetailGoal(null)} />
+      )}
+
+      {error && <ErrorNotice message="Couldn't load your goals right now. Try refreshing the page." />}
+
+      {loading && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
       )}
 
       {!loading && goals.length === 0 && (

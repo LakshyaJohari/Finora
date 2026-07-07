@@ -10,11 +10,12 @@ import { TRANSACTION_CATEGORIES } from '../types'
 import type { Transaction } from '../types'
 import { categorizeTransactions } from '../lib/groq'
 import { detectRecurring } from '../lib/recurring'
+import { ErrorNotice } from '../components/Skeleton'
 
 const currency = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
 export default function Expenses() {
-  const { transactions, loading, addTransaction, bulkInsertTransactions, updateTransaction } = useTransactions()
+  const { transactions, loading, error: fetchError, addTransaction, bulkInsertTransactions, updateTransaction } = useTransactions()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -112,6 +113,8 @@ export default function Expenses() {
           onImport={(inputs) => bulkInsertTransactions(inputs).then((rows) => categorizeAndUpdate(rows))}
         />
       )}
+
+      {fetchError && <ErrorNotice message="Couldn't load your expenses right now. Try refreshing the page." />}
 
       {categorizeNotice && (
         <p className="rounded-card border border-danger/20 bg-danger-tint px-4 py-3 text-sm text-danger">

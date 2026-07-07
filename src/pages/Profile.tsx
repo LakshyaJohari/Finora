@@ -4,22 +4,25 @@ import { Landmark, Trash2, Download } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useRequireAuth } from '../hooks/useRequireAuth'
+import { useProfile } from '../hooks/useProfile'
 import { Button } from '../components/Button'
 import { RequireAuthButton } from '../components/RequireAuth'
-
-const demoAccounts = [
-  { id: 'acc1', name: 'Chase Total Checking', mask: '••4821' },
-  { id: 'acc2', name: 'Ally Online Savings', mask: '••1190' },
-]
 
 export default function Profile() {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const guard = useRequireAuth()
+  const { profile, updateProfile } = useProfile()
   const [searchParams] = useSearchParams()
-  const [name, setName] = useState((user?.user_metadata?.full_name as string) ?? '')
+  const [name, setName] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [nameSaved, setNameSaved] = useState(false)
   const [emailNotifs, setEmailNotifs] = useState(true)
   const [weeklyDigest, setWeeklyDigest] = useState(true)
+
+  useEffect(() => {
+    if (profile) setName(profile.full_name ?? '')
+  }, [profile])
 
   useEffect(() => {
     const section = searchParams.get('section')
@@ -27,6 +30,17 @@ export default function Profile() {
       document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [searchParams])
+
+  async function handleSaveName() {
+    setSavingName(true)
+    setNameSaved(false)
+    try {
+      await updateProfile({ full_name: name.trim() || null })
+      setNameSaved(true)
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   if (!user) {
     return (
@@ -69,9 +83,12 @@ export default function Profile() {
             className="mt-1 w-full rounded-lg border border-border bg-base px-3 py-2 text-ink-muted"
           />
         </label>
-        <RequireAuthButton action={() => {}} className="self-start">
-          Save changes
-        </RequireAuthButton>
+        <div className="flex items-center gap-3">
+          <RequireAuthButton action={handleSaveName} disabled={savingName} className="self-start">
+            {savingName ? 'Saving…' : 'Save changes'}
+          </RequireAuthButton>
+          {nameSaved && <span className="text-sm text-teal-dark">Saved.</span>}
+        </div>
       </section>
 
       <section id="notifications" className="card flex flex-col gap-4">
@@ -98,26 +115,16 @@ export default function Profile() {
 
       <section id="accounts" className="card flex flex-col gap-4">
         <h2 className="font-display text-xl text-ink">Connected accounts</h2>
-        <div className="divide-y divide-border">
-          {demoAccounts.map((acc) => (
-            <div key={acc.id} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-tint text-teal-dark">
-                  <Landmark size={16} />
-                </span>
-                <div>
-                  <p className="text-ink">{acc.name}</p>
-                  <p className="text-sm text-ink-muted">{acc.mask}</p>
-                </div>
-              </div>
-              <RequireAuthButton action={() => {}} variant="ghost">
-                Disconnect
-              </RequireAuthButton>
-            </div>
-          ))}
+        <div className="flex flex-col items-center gap-2 rounded-card border border-dashed border-border bg-base py-8 text-center">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-tint text-teal-dark">
+            <Landmark size={16} />
+          </span>
+          <p className="text-sm text-ink-muted">
+            No accounts connected yet. You're tracking expenses manually or via CSV import for now.
+          </p>
         </div>
-        <RequireAuthButton action={() => {}} variant="secondary" className="self-start">
-          Connect an account
+        <RequireAuthButton action={() => {}} variant="secondary" className="self-start" disabled>
+          Connect an account (coming soon)
         </RequireAuthButton>
       </section>
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Sparkles, Receipt } from 'lucide-react'
+import { Button } from '../components/Button'
 import {
   Area,
   AreaChart,
@@ -25,6 +26,7 @@ import {
 } from '../lib/dashboardStats'
 import { computeHealthScore } from '../lib/healthScore'
 import { HealthScoreCard } from '../components/HealthScoreCard'
+import { CardSkeleton, ErrorNotice } from '../components/Skeleton'
 
 const currency = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
@@ -36,7 +38,7 @@ const SPARSE_THRESHOLD = 5
 export default function Dashboard() {
   const { user } = useAuth()
   const { theme } = useTheme()
-  const { transactions, loading } = useTransactions()
+  const { transactions, loading, error } = useTransactions()
   const { goals } = useGoals()
   const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0]
 
@@ -50,9 +52,34 @@ export default function Dashboard() {
   const gridColor = theme === 'dark' ? '#33413D' : '#E8E2D6'
   const tooltipBg = theme === 'dark' ? '#242B29' : '#FFFFFF'
 
-  const isSparse = !loading && transactions.length < SPARSE_THRESHOLD
+  const isSparse = transactions.length < SPARSE_THRESHOLD
 
-  if (!loading && transactions.length === 0) {
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Your financial picture</h1>
+          <p className="mt-1 text-ink-muted">Here's where things stand today.</p>
+        </div>
+        <CardSkeleton lines={4} />
+        <CardSkeleton lines={3} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="font-display text-3xl text-ink">Your financial picture</h1>
+          <p className="mt-1 text-ink-muted">Here's where things stand today.</p>
+        </div>
+        <ErrorNotice message="Couldn't load your dashboard right now. Try refreshing the page." />
+      </div>
+    )
+  }
+
+  if (transactions.length === 0) {
     return (
       <div className="flex flex-col gap-6">
         <div>
@@ -70,8 +97,8 @@ export default function Dashboard() {
             Add a few expenses or import a CSV and your dashboard will fill in with real numbers,
             charts, and insights.
           </p>
-          <Link to="/expenses" className="mt-2 inline-flex rounded-full bg-teal px-5 py-2.5 font-medium text-white transition hover:bg-teal-dark">
-            Go to Expenses
+          <Link to="/expenses" className="mt-2">
+            <Button>Go to Expenses</Button>
           </Link>
         </div>
       </div>

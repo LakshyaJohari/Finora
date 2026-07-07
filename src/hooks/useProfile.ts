@@ -35,5 +35,13 @@ export function useProfile() {
     refetch()
   }, [refetch])
 
-  return { profile, loading, error, refetch }
+  async function updateProfile(patch: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) {
+    if (!user) throw new Error('Must be signed in to update your profile')
+    const { data, error } = await supabase.from('profiles').update(patch).eq('id', user.id).select().single()
+    if (error) throw new Error(error.message)
+    setProfile(data as Profile)
+    return data as Profile
+  }
+
+  return { profile, loading, error, refetch, updateProfile }
 }
