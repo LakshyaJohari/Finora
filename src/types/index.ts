@@ -32,6 +32,10 @@ export interface Transaction {
   created_at: string
 }
 
+export const GOAL_CATEGORIES = ['Emergency Fund', 'Travel', 'Home', 'Education', 'Retirement', 'Other'] as const
+
+export type GoalCategory = (typeof GOAL_CATEGORIES)[number]
+
 export interface Goal {
   id: string
   user_id: string
