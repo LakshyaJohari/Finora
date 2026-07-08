@@ -38,7 +38,7 @@
 
   @keyframes piggy-coin-fall {
     0% {
-      transform: translateY(-92px);
+      transform: translateY(-110px);
       opacity: 0;
     }
     8% {
@@ -54,7 +54,7 @@
     }
     100% {
       opacity: 0;
-      transform: translateY(-92px);
+      transform: translateY(-110px);
     }
   }
 
