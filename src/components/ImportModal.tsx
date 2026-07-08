@@ -1,12 +1,15 @@
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { parseTransactionsCsv, type ParsedCsvRow } from '../lib/csv'
+import { resizeImageToDataUrl } from '../lib/imageResize'
+import { extractTransactionsFromImage } from '../lib/groq'
 import type { NewTransaction } from '../hooks/useTransactions'
 
 const currency = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
-export function ImportCsvModal({
+export function ImportModal({
   onClose,
   onImport,
 }: {
@@ -16,6 +19,7 @@ export function ImportCsvModal({
   const [rows, setRows] = useState<ParsedCsvRow[]>([])
   const [fileName, setFileName] = useState<string | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
+  const [extracting, setExtracting] = useState(false)
   const [importing, setImporting] = useState(false)
 
   const validRows = rows.filter((r) => r.date && r.amount != null)
@@ -24,11 +28,35 @@ export function ImportCsvModal({
   async function handleFile(file: File) {
     setFileName(file.name)
     setParseError(null)
+
+    const isImage = file.type.startsWith('image/')
+    if (!isImage) {
+      try {
+        const parsed = await parseTransactionsCsv(file)
+        setRows(parsed)
+      } catch {
+        setParseError('Could not read that file. Make sure it’s a CSV export from your bank.')
+      }
+      return
+    }
+
+    setExtracting(true)
     try {
-      const parsed = await parseTransactionsCsv(file)
-      setRows(parsed)
+      const dataUrl = await resizeImageToDataUrl(file)
+      const extracted = await extractTransactionsFromImage(dataUrl)
+      if (!extracted) {
+        setParseError("Couldn't read that image right now - try again, or use a CSV export instead.")
+        return
+      }
+      if (extracted.length === 0) {
+        setParseError("Didn't find any readable transactions in that image. Try a clearer photo.")
+        return
+      }
+      setRows(extracted)
     } catch {
-      setParseError('Could not read that file. Make sure it’s a CSV export from your bank.')
+      setParseError('Could not read that image.')
+    } finally {
+      setExtracting(false)
     }
   }
 
@@ -52,20 +80,32 @@ export function ImportCsvModal({
   }
 
   return (
-    <Modal title="Bulk import from CSV" onClose={onClose} widthClassName="max-w-2xl">
+    <Modal title="Bulk import" onClose={onClose} widthClassName="max-w-2xl">
       <div className="flex flex-col gap-4">
         {rows.length === 0 && (
           <>
             <p className="text-sm text-ink-muted">
-              Upload a bank statement CSV with date, description, and amount columns (common naming
-              variations are handled automatically). We won't categorize these yet — that happens
-              right after import.
+              Upload a bank statement CSV, or a photo of a receipt or statement - we'll read the
+              transactions out automatically. We won't categorize these yet — that happens right
+              after import.
             </p>
-            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-border bg-base px-6 py-10 text-center text-sm text-ink-muted transition hover:border-teal hover:text-teal-dark">
-              <span>{fileName ?? 'Click to choose a CSV file'}</span>
+            <label
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-border bg-base px-6 py-10 text-center text-sm text-ink-muted transition ${
+                extracting ? 'opacity-60' : 'hover:border-teal hover:text-teal-dark'
+              }`}
+            >
+              {extracting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
+                  Reading {fileName}…
+                </span>
+              ) : (
+                <span>{fileName ?? 'Click to choose a CSV file or photo'}</span>
+              )}
               <input
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,image/*"
+                disabled={extracting}
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -89,6 +129,7 @@ export function ImportCsvModal({
                 onClick={() => {
                   setRows([])
                   setFileName(null)
+                  setParseError(null)
                 }}
                 className="text-sm font-medium text-teal hover:text-teal-dark"
               >

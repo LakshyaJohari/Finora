@@ -88,5 +88,17 @@ export function useAdvisorChat() {
     [user, transactions, goals, messages, sending],
   )
 
-  return { messages, loading, sending, error, sendMessage }
+  const clearChat = useCallback(async () => {
+    if (!user) return
+    const previous = messages
+    setMessages([])
+    setError(null)
+    const { error: deleteError } = await supabase.from('chat_messages').delete().eq('user_id', user.id)
+    if (deleteError) {
+      setMessages(previous)
+      setError("Couldn't clear the conversation. Try again in a moment.")
+    }
+  }, [user, messages])
+
+  return { messages, loading, sending, error, sendMessage, clearChat }
 }

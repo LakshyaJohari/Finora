@@ -8,9 +8,11 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 // unset, like on Vercel.
 const dispatcher = new EnvHttpProxyAgent()
 
+export type GroqContentBlock = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+
 interface GroqMessage {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | GroqContentBlock[]
 }
 
 export async function callGroq(

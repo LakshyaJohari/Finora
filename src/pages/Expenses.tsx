@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, TrendingUp, Upload, Receipt, RefreshCw } from 'lucide-react'
 import { RequireAuthButton } from '../components/RequireAuth'
 import { AddTransactionModal } from '../components/AddTransactionModal'
-import { ImportCsvModal } from '../components/ImportCsvModal'
+import { ImportModal } from '../components/ImportModal'
 import { CategoryBadge } from '../components/CategoryBadge'
 import { ReasoningHint } from '../components/ReasoningHint'
 import { useTransactions } from '../hooks/useTransactions'
@@ -139,7 +139,7 @@ export default function Expenses() {
         />
       )}
       {showImportModal && (
-        <ImportCsvModal
+        <ImportModal
           onClose={() => setShowImportModal(false)}
           onImport={(inputs) => bulkInsertTransactions(inputs).then((rows) => categorizeAndUpdate(rows))}
         />

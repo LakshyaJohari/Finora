@@ -67,6 +67,13 @@ function localApiRoutes(env: Record<string, string>): Plugin {
         const reply = await getAdvisorReply(String(body?.context ?? ''), body?.history ?? [], String(body?.message ?? ''))
         return { reply }
       })
+
+      jsonRoute(server, '/api/extract', async (body) => {
+        const { extractTransactionsFromImage } = await import('./api/_shared/extract.ts')
+        const today = String(body?.today ?? new Date().toISOString().slice(0, 10))
+        const transactions = await extractTransactionsFromImage(String(body?.image ?? ''), today)
+        return { transactions }
+      })
     },
   }
 }

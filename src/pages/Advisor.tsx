@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, RotateCcw } from 'lucide-react'
 import { useRequireAuth } from '../hooks/useRequireAuth'
 import { useAdvisorChat } from '../hooks/useAdvisorChat'
 import { GroundedText } from '../components/GroundedText'
 import { TypingIndicator } from '../components/TypingIndicator'
+import { RequireAuthButton } from '../components/RequireAuth'
 
 const SUGGESTED_PROMPTS = [
   'Can I afford a $500 purchase?',
@@ -14,8 +15,9 @@ const SUGGESTED_PROMPTS = [
 
 export default function Advisor() {
   const guard = useRequireAuth()
-  const { messages, loading, sending, error, sendMessage } = useAdvisorChat()
+  const { messages, loading, sending, error, sendMessage, clearChat } = useAdvisorChat()
   const [draft, setDraft] = useState('')
+  const [confirmingClear, setConfirmingClear] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -36,6 +38,41 @@ export default function Advisor() {
       </div>
 
       <div className="card flex h-[32rem] flex-col p-0">
+        {messages.length > 0 && (
+          <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2.5">
+            {confirmingClear ? (
+              <>
+                <span className="text-sm text-ink-muted">Clear this conversation?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await clearChat()
+                    setConfirmingClear(false)
+                  }}
+                  className="rounded-full bg-danger px-3 py-1 text-sm font-medium text-white transition hover:bg-danger/90"
+                >
+                  Yes, clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClear(false)}
+                  className="rounded-full px-3 py-1 text-sm font-medium text-ink-muted transition hover:bg-teal-tint"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <RequireAuthButton
+                action={() => setConfirmingClear(true)}
+                variant="ghost"
+                className="!px-3 !py-1 text-sm"
+              >
+                <RotateCcw size={14} />
+                New chat
+              </RequireAuthButton>
+            )}
+          </div>
+        )}
         <div className="flex-1 space-y-3 overflow-y-auto p-6">
           {!loading && messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
