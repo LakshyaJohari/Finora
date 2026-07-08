@@ -18,6 +18,10 @@ export const TRANSACTION_CATEGORIES = [
 
 export type TransactionCategory = (typeof TRANSACTION_CATEGORIES)[number]
 
+export const INCOME_CATEGORIES = ['Salary', 'Investment', 'Freelance', 'Gift', 'Other Income'] as const
+
+export type IncomeCategory = (typeof INCOME_CATEGORIES)[number]
+
 export interface Transaction {
   id: string
   user_id: string

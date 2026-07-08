@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Upload, Receipt, RefreshCw } from 'lucide-react'
+import { Plus, TrendingUp, Upload, Receipt, RefreshCw } from 'lucide-react'
 import { RequireAuthButton } from '../components/RequireAuth'
-import { AddExpenseModal } from '../components/AddExpenseModal'
+import { AddTransactionModal } from '../components/AddTransactionModal'
 import { ImportCsvModal } from '../components/ImportCsvModal'
 import { CategoryBadge } from '../components/CategoryBadge'
 import { ReasoningHint } from '../components/ReasoningHint'
 import { useTransactions } from '../hooks/useTransactions'
-import { TRANSACTION_CATEGORIES } from '../types'
+import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../types'
 import type { Transaction } from '../types'
 import { categorizeTransactions } from '../lib/groq'
 import { detectRecurring } from '../lib/recurring'
@@ -17,6 +17,7 @@ const currency = (n: number) => n.toLocaleString('en-US', { style: 'currency', c
 export default function Expenses() {
   const { transactions, loading, error: fetchError, addTransaction, bulkInsertTransactions, updateTransaction } = useTransactions()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [addModalType, setAddModalType] = useState<'expense' | 'income'>('expense')
   const [showImportModal, setShowImportModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
@@ -62,10 +63,24 @@ export default function Expenses() {
   async function categorizeAndUpdate(rows: Transaction[]) {
     const candidates = rows.filter((r) => r.category === 'Uncategorized')
     if (candidates.length === 0) return
+
+    // The LLM categorizer only knows expense categories - a CSV-imported
+    // deposit shouldn't get forced into one of those. Sign alone already
+    // tells us it's income, so handle it deterministically instead.
+    const incomeCandidates = candidates.filter((r) => r.amount >= 0)
+    if (incomeCandidates.length > 0) {
+      await Promise.all(
+        incomeCandidates.map((r) => updateTransaction(r.id, { category: 'Other Income' }).catch(() => {})),
+      )
+    }
+
+    const expenseCandidates = candidates.filter((r) => r.amount < 0)
+    if (expenseCandidates.length === 0) return
+
     setCategorizing(true)
     setCategorizeNotice(null)
     const results = await categorizeTransactions(
-      candidates.map((r) => ({ id: r.id, merchant: r.merchant, description: r.description, amount: r.amount })),
+      expenseCandidates.map((r) => ({ id: r.id, merchant: r.merchant, description: r.description, amount: r.amount })),
     )
     if (!results) {
       setCategorizeNotice("We couldn't auto-categorize these right now - they're saved as Uncategorized, and you can try again anytime.")
@@ -87,14 +102,29 @@ export default function Expenses() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl text-ink">Expenses</h1>
-          <p className="mt-1 text-ink-muted">Everything you've spent, in one place.</p>
+          <p className="mt-1 text-ink-muted">Everything you've spent and earned, in one place.</p>
         </div>
         <div className="flex gap-2">
           <RequireAuthButton action={() => setShowImportModal(true)} variant="secondary">
             <Upload size={16} />
             Bulk import
           </RequireAuthButton>
-          <RequireAuthButton action={() => setShowAddModal(true)}>
+          <RequireAuthButton
+            action={() => {
+              setAddModalType('income')
+              setShowAddModal(true)
+            }}
+            variant="secondary"
+          >
+            <TrendingUp size={16} />
+            Add income
+          </RequireAuthButton>
+          <RequireAuthButton
+            action={() => {
+              setAddModalType('expense')
+              setShowAddModal(true)
+            }}
+          >
             <Plus size={16} />
             Add expense
           </RequireAuthButton>
@@ -102,7 +132,8 @@ export default function Expenses() {
       </div>
 
       {showAddModal && (
-        <AddExpenseModal
+        <AddTransactionModal
+          initialType={addModalType}
           onClose={() => setShowAddModal(false)}
           onSubmit={(input) => addTransaction(input).then(() => {})}
         />
@@ -148,13 +179,29 @@ export default function Expenses() {
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-tint text-teal-dark">
             <Receipt size={22} />
           </span>
-          <h2 className="font-display text-xl text-ink">No expenses yet</h2>
+          <h2 className="font-display text-xl text-ink">Nothing tracked yet</h2>
           <p className="max-w-sm text-ink-muted">
-            Add your first expense manually, or import a CSV from your bank to get your history in
-            all at once.
+            Add your first expense or income manually, or import a CSV from your bank to get your
+            history in all at once.
           </p>
-          <div className="mt-2 flex gap-3">
-            <RequireAuthButton action={() => setShowAddModal(true)}>Add an expense</RequireAuthButton>
+          <div className="mt-2 flex flex-wrap justify-center gap-3">
+            <RequireAuthButton
+              action={() => {
+                setAddModalType('expense')
+                setShowAddModal(true)
+              }}
+            >
+              Add an expense
+            </RequireAuthButton>
+            <RequireAuthButton
+              action={() => {
+                setAddModalType('income')
+                setShowAddModal(true)
+              }}
+              variant="secondary"
+            >
+              Add income
+            </RequireAuthButton>
             <RequireAuthButton action={() => setShowImportModal(true)} variant="secondary">
               Import a CSV
             </RequireAuthButton>
@@ -171,11 +218,20 @@ export default function Expenses() {
               className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-ink"
             >
               <option value="All">All categories</option>
-              {TRANSACTION_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <optgroup label="Expense">
+                {TRANSACTION_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Income">
+                {INCOME_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </optgroup>
             </select>
             <button
               type="button"

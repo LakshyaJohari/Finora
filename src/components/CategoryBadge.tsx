@@ -7,6 +7,11 @@ const CATEGORY_STYLES: Record<string, string> = {
   Health: 'bg-teal-tint text-teal-dark',
   Other: 'bg-base text-ink-muted border border-border',
   Uncategorized: 'bg-base text-ink-muted border border-border',
+  Salary: 'bg-teal-tint text-teal-dark',
+  Investment: 'bg-teal-tint text-teal-dark',
+  Freelance: 'bg-teal-tint text-teal-dark',
+  Gift: 'bg-marigold-tint text-marigold',
+  'Other Income': 'bg-teal-tint text-teal-dark',
 }
 
 export function CategoryBadge({ category }: { category: string }) {
