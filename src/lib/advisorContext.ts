@@ -3,25 +3,11 @@ import { computeStats, computeCategoryBreakdown, computeTopCategoryInsight } fro
 import { computeHealthScore } from './healthScore'
 import { detectRecurring } from './recurring'
 import { computeAverageMonthlySavings, computeGoalProjection, goalStatusLabel } from './goalProjection'
+import { computeMonthlyHistory, computeYearlyHistory } from './history'
 
 const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
-/** Total expenses per month for the last `count` months (this month first). */
-function recentMonthlyExpenses(transactions: Transaction[], now: Date, count: number) {
-  const totals = new Map<string, number>()
-  for (const t of transactions) {
-    if (t.amount >= 0) continue
-    const d = new Date(t.transaction_date)
-    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`
-    totals.set(key, (totals.get(key) ?? 0) + Math.abs(t.amount))
-  }
-  return Array.from({ length: count }, (_, i) => {
-    const d = new Date(now)
-    d.setUTCMonth(d.getUTCMonth() - i)
-    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`
-    return { label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }), total: totals.get(key) ?? 0 }
-  })
-}
+const RECENT_MONTHS_DETAIL = 12
 
 /**
  * Assembles a compact, structured summary of the user's real financial
@@ -52,8 +38,28 @@ export function buildAdvisorContext(transactions: Transaction[], goals: Goal[], 
     lines.push('No spending logged yet this month.')
   }
 
-  const monthlyHistory = recentMonthlyExpenses(transactions, now, 4)
-  lines.push(`Total expenses by month (most recent first): ${monthlyHistory.map((m) => `${m.label} ${fmt(m.total)}`).join(', ')}.`)
+  // Full history, not just a recent window: detailed months up to a cap (keeps
+  // token count bounded for long-tenured accounts), plus yearly totals so
+  // older activity - like a big one-off transaction from years back - is
+  // still visible to the advisor even once it ages out of the monthly detail.
+  const monthlyHistory = computeMonthlyHistory(transactions)
+  if (monthlyHistory.length > 0) {
+    const recentDetail = monthlyHistory.slice(0, RECENT_MONTHS_DETAIL)
+    lines.push(
+      `Monthly history, most recent first (income / expenses / net): ${recentDetail
+        .map((m) => `${m.label}: ${fmt(m.income)} / ${fmt(m.expenses)} / ${fmt(m.net)}`)
+        .join('; ')}.`,
+    )
+  }
+
+  const yearlyHistory = computeYearlyHistory(transactions)
+  if (yearlyHistory.length > 1) {
+    lines.push(
+      `Yearly totals across all recorded history (income / expenses / net): ${yearlyHistory
+        .map((y) => `${y.year}: ${fmt(y.income)} / ${fmt(y.expenses)} / ${fmt(y.net)}`)
+        .join('; ')}.`,
+    )
+  }
 
   const topCategoryInsight = computeTopCategoryInsight(transactions, now)
   if (topCategoryInsight && topCategoryInsight.threeMonthAverage > 0) {
