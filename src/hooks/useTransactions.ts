@@ -79,5 +79,20 @@ export function useTransactions() {
     return data as Transaction
   }
 
-  return { transactions, loading, error, refetch, addTransaction, bulkInsertTransactions, updateTransaction }
+  async function deleteTransaction(id: string) {
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    setTransactions((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  return {
+    transactions,
+    loading,
+    error,
+    refetch,
+    addTransaction,
+    bulkInsertTransactions,
+    updateTransaction,
+    deleteTransaction,
+  }
 }

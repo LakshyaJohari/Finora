@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, TrendingUp, Upload, Receipt, RefreshCw } from 'lucide-react'
+import { Plus, TrendingUp, Upload, Receipt, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 import { RequireAuthButton } from '../components/RequireAuth'
 import { AddTransactionModal } from '../components/AddTransactionModal'
 import { ImportModal } from '../components/ImportModal'
@@ -15,14 +15,25 @@ import { ErrorNotice } from '../components/Skeleton'
 const currency = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 
 export default function Expenses() {
-  const { transactions, loading, error: fetchError, addTransaction, bulkInsertTransactions, updateTransaction } = useTransactions()
+  const {
+    transactions,
+    loading,
+    error: fetchError,
+    addTransaction,
+    bulkInsertTransactions,
+    updateTransaction,
+    deleteTransaction,
+  } = useTransactions()
   const [showAddModal, setShowAddModal] = useState(false)
   const [addModalType, setAddModalType] = useState<'expense' | 'income'>('expense')
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
   const [categorizing, setCategorizing] = useState(false)
   const [categorizeNotice, setCategorizeNotice] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const recurringGroups = useMemo(() => detectRecurring(transactions), [transactions])
   const recurringSyncAttempted = useRef<Set<string>>(new Set())
@@ -47,6 +58,11 @@ export default function Expenses() {
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recurringGroups])
+
+  const customCategories = useMemo(() => {
+    const known = new Set<string>([...TRANSACTION_CATEGORIES, ...INCOME_CATEGORIES])
+    return Array.from(new Set(transactions.map((t) => t.category).filter((c) => !known.has(c)))).sort()
+  }, [transactions])
 
   const visible = useMemo(() => {
     let rows = transactions
@@ -131,11 +147,19 @@ export default function Expenses() {
         </div>
       </div>
 
-      {showAddModal && (
+      {(showAddModal || editingTransaction) && (
         <AddTransactionModal
+          transaction={editingTransaction ?? undefined}
           initialType={addModalType}
-          onClose={() => setShowAddModal(false)}
-          onSubmit={(input) => addTransaction(input).then(() => {})}
+          onClose={() => {
+            setShowAddModal(false)
+            setEditingTransaction(null)
+          }}
+          onSubmit={(input) =>
+            editingTransaction
+              ? updateTransaction(editingTransaction.id, input).then(() => {})
+              : addTransaction(input).then(() => {})
+          }
         />
       )}
       {showImportModal && (
@@ -232,6 +256,15 @@ export default function Expenses() {
                   </option>
                 ))}
               </optgroup>
+              {customCategories.length > 0 && (
+                <optgroup label="Custom">
+                  {customCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <button
               type="button"
@@ -276,14 +309,59 @@ export default function Expenses() {
                       })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <CategoryBadge category={tx.category} />
-                    <ReasoningHint reasoning={tx.ai_category_reasoning} />
-                    <p className={`w-24 text-right font-mono text-sm ${tx.amount > 0 ? 'text-teal-dark' : 'text-ink'}`}>
-                      {tx.amount > 0 ? '+' : ''}
-                      {currency(tx.amount)}
-                    </p>
-                  </div>
+                  {confirmDeleteId === tx.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-ink-muted">Delete this transaction?</span>
+                      <button
+                        type="button"
+                        disabled={deletingId === tx.id}
+                        onClick={async () => {
+                          setDeletingId(tx.id)
+                          try {
+                            await deleteTransaction(tx.id)
+                          } finally {
+                            setDeletingId(null)
+                            setConfirmDeleteId(null)
+                          }
+                        }}
+                        className="rounded-full bg-danger px-3 py-1 text-sm font-medium text-white transition hover:bg-danger/90 disabled:opacity-50"
+                      >
+                        {deletingId === tx.id ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="rounded-full px-3 py-1 text-sm font-medium text-ink-muted transition hover:bg-teal-tint"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <CategoryBadge category={tx.category} />
+                      <ReasoningHint reasoning={tx.ai_category_reasoning} />
+                      <p className={`w-24 text-right font-mono text-sm ${tx.amount > 0 ? 'text-teal-dark' : 'text-ink'}`}>
+                        {tx.amount > 0 ? '+' : ''}
+                        {currency(tx.amount)}
+                      </p>
+                      <RequireAuthButton
+                        action={() => setEditingTransaction(tx)}
+                        variant="ghost"
+                        className="!px-2 !py-2"
+                        aria-label="Edit transaction"
+                      >
+                        <Pencil size={14} />
+                      </RequireAuthButton>
+                      <RequireAuthButton
+                        action={() => setConfirmDeleteId(tx.id)}
+                        variant="ghost"
+                        className="!px-2 !py-2 hover:!bg-danger-tint hover:!text-danger"
+                        aria-label="Delete transaction"
+                      >
+                        <Trash2 size={14} />
+                      </RequireAuthButton>
+                    </div>
+                  )}
                 </div>
               ))}
               {visible.length === 0 && (
