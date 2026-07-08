@@ -7,7 +7,7 @@ export interface DashboardStats {
   savingsRate: number | null
 }
 
-function isSameMonth(dateStr: string, ref: Date) {
+export function isSameMonth(dateStr: string, ref: Date) {
   const d = new Date(dateStr)
   return d.getUTCFullYear() === ref.getUTCFullYear() && d.getUTCMonth() === ref.getUTCMonth()
 }

@@ -7,6 +7,7 @@ const links = [
   { to: '/expenses', label: 'Expenses' },
   { to: '/goals', label: 'Goals' },
   { to: '/advisor', label: 'Advisor' },
+  { to: '/history', label: 'History' },
 ]
 
 export function Nav() {

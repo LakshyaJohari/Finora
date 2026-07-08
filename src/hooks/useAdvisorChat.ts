@@ -100,5 +100,5 @@ export function useAdvisorChat() {
     }
   }, [user, messages])
 
-  return { messages, loading, sending, error, sendMessage, clearChat, transactions }
+  return { messages, loading, sending, error, sendMessage, clearChat }
 }
