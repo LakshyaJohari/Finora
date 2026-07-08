@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { PiggyBank } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { CoinJarAnimation } from '../components/CoinJarAnimation'
+import { CoinFlipAnimation } from '../components/CoinFlipAnimation'
 import { TopographicPattern } from '../components/TopographicPattern'
 import { GoogleIcon } from '../components/GoogleIcon'
 import { Button } from '../components/Button'
@@ -69,7 +69,7 @@ export default function Login() {
         </Link>
 
         <div className="relative z-10 h-64 w-64">
-          <CoinJarAnimation />
+          <CoinFlipAnimation />
         </div>
 
         <h2 className="relative z-10 max-w-xs text-center font-display text-2xl leading-snug text-white">
